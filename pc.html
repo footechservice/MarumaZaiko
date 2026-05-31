@@ -168,6 +168,52 @@ tr:hover td{background:#fafafa;}
     <div class="br"><button class="btn btn-g" onclick="expCSV('inv')">📊 在庫一覧</button><button class="btn btn-g" onclick="expCSV('ord')">📦 発注リスト</button><button class="btn btn-d" onclick="expCSV('hist')">🕐 更新履歴</button></div>
     <div class="csvprev" id="csvprev"></div>
   </div>
+
+  <!-- TenpoVisor CSVインポート -->
+  <div class="card">
+    <div class="ch"><span class="ct">📥 TenpoVisor 商品CSVインポート</span></div>
+    <p style="color:#666;font-size:13px;margin-bottom:14px;">TenpoVisorからエクスポートした <strong>item_list.csv</strong> をドラッグ＆ドロップするか、クリックして選択してください。★新規★と価格0円の商品は自動的に除外されます。</p>
+    <div id="imp-box" style="border:2px dashed #e0e0e0;border-radius:10px;padding:30px;text-align:center;cursor:pointer;background:#fafafa;transition:all .2s;"
+      onclick="document.getElementById('imp-file').click()"
+      ondragover="event.preventDefault();this.style.borderColor='var(--red)';this.style.background='#fff5f5'"
+      ondragleave="this.style.borderColor='#e0e0e0';this.style.background='#fafafa'"
+      ondrop="dropCSV(event)">
+      <div style="font-size:36px;margin-bottom:10px;">📂</div>
+      <p style="font-size:14px;color:#666;">item_list.csv をここにドロップ</p>
+      <p style="font-size:12px;color:#aaa;margin-top:4px;">またはクリックしてファイルを選択</p>
+    </div>
+    <input type="file" id="imp-file" accept=".csv" style="display:none;" onchange="handleCSV(this)">
+
+    <!-- プレビュー -->
+    <div id="imp-preview" style="display:none;margin-top:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div>
+          <span id="imp-count" style="font-size:14px;font-weight:600;"></span>
+          <span id="imp-skip" style="font-size:12px;color:#888;margin-left:8px;"></span>
+        </div>
+        <div class="br">
+          <select id="imp-mode" style="padding:7px 12px;border:1px solid #e0e0e0;border-radius:7px;font-size:13px;font-family:inherit;">
+            <option value="add">既存商品に追加（重複はスキップ）</option>
+            <option value="merge">既存商品とマージ（コードが同じなら更新）</option>
+            <option value="replace">全て置き換え（既存商品を削除して入れ替え）</option>
+          </select>
+          <button class="btn btn-r" onclick="execImport()">⬆️ インポート実行</button>
+        </div>
+      </div>
+      <div style="max-height:300px;overflow-y:auto;border:1px solid #e0e0e0;border-radius:8px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:#f8f9fa;position:sticky;top:0;">
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:#666;font-weight:600;border-bottom:1px solid #e0e0e0;">商品コード</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:#666;font-weight:600;border-bottom:1px solid #e0e0e0;">商品名</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:#666;font-weight:600;border-bottom:1px solid #e0e0e0;">部門</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:#666;font-weight:600;border-bottom:1px solid #e0e0e0;">税抜単価</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:#666;font-weight:600;border-bottom:1px solid #e0e0e0;">状態</th>
+          </tr></thead>
+          <tbody id="imp-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="p-history" class="pg">
@@ -313,6 +359,145 @@ function pg(name,el){
   if(name==="history") renderHistPg();
 }
 function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("on"); setTimeout(()=>t.classList.remove("on"),2800); }
+
+// ── CSVインポート ─────────────────────────────────
+let importRows = [];
+
+function dropCSV(e){
+  e.preventDefault();
+  const box=document.getElementById("imp-box");
+  box.style.borderColor="#e0e0e0"; box.style.background="#fafafa";
+  const f=e.dataTransfer.files[0];
+  if(f) readCSVFile(f);
+}
+function handleCSV(inp){
+  const f=inp.files[0];
+  if(f) readCSVFile(f);
+}
+function readCSVFile(file){
+  const reader=new FileReader();
+  reader.onload=function(e){
+    // BOM除去
+    let text=e.target.result.replace(/^﻿/,"");
+    parseCSV(text);
+  };
+  reader.readAsText(file,"UTF-8");
+}
+
+function parseCSV(text){
+  const lines=text.split(/?
+/).filter(l=>l.trim());
+  if(lines.length<2){ toast("⚠️ CSVの読み込みに失敗しました"); return; }
+
+  // ヘッダー行
+  const headers=lines[0].split(",").map(h=>h.trim().replace(/^"|"$/g,""));
+  // 列インデックスを取得
+  const idxCode=headers.findIndex(h=>h.includes("商品コード"));
+  const idxName=headers.findIndex(h=>h.includes("商品名"));
+  const idxPrice=headers.findIndex(h=>h.includes("税抜金額"));
+  const idxDept=headers.findIndex(h=>h.includes("部門"));
+
+  importRows=[];
+  let skipCount=0;
+
+  for(let i=1;i<lines.length;i++){
+    const cols=lines[i].split(",").map(c=>c.trim().replace(/^"|"$/g,""));
+    if(cols.length<3) continue;
+    const code=cols[idxCode]||"";
+    const name=cols[idxName]||"";
+    const priceStr=cols[idxPrice]||"0";
+    const dept=cols[idxDept]||"";
+    const price=parseInt(priceStr)||0;
+
+    // 除外条件：★新規★、空白、価格0かつ名前がその他系
+    if(!name || name.includes("★新規★") || name.trim()===""){
+      skipCount++; continue;
+    }
+
+    // 部門コードと部門名を分離（例："101 [海鮮丼]" → code:101, name:海鮮丼）
+    const deptMatch=dept.match(/^(\d+)\s*\[(.+)\]$/);
+    const deptCode=deptMatch?deptMatch[1]:"";
+    const deptName=deptMatch?deptMatch[2]:dept;
+
+    importRows.push({
+      code, name, dept:deptName, deptCode, price,
+      stock:0, minStock:10, expiry:"", img:"", memo:""
+    });
+  }
+
+  renderImportPreview(skipCount);
+}
+
+function renderImportPreview(skipCount){
+  const el=document.getElementById("imp-preview");
+  el.style.display="block";
+  document.getElementById("imp-count").textContent=`${importRows.length}件の商品を読み込みました`;
+  document.getElementById("imp-skip").textContent=`（★新規★など ${skipCount}件を除外）`;
+
+  document.getElementById("imp-tbody").innerHTML=importRows.map(r=>{
+    const exists=prods.find(p=>p.code===r.code);
+    const status=exists
+      ? `<span style="color:#e65100;font-size:11px;">既存（${exists.stock}個）</span>`
+      : `<span style="color:#2e7d32;font-size:11px;">新規</span>`;
+    return `<tr>
+      <td style="padding:7px 12px;border-bottom:1px solid #f5f5f5;font-size:12px;color:#888;">${r.code}</td>
+      <td style="padding:7px 12px;border-bottom:1px solid #f5f5f5;font-size:13px;"><strong>${r.name}</strong></td>
+      <td style="padding:7px 12px;border-bottom:1px solid #f5f5f5;font-size:12px;color:#666;">${r.dept}</td>
+      <td style="padding:7px 12px;border-bottom:1px solid #f5f5f5;font-size:12px;text-align:right;">${r.price.toLocaleString()}円</td>
+      <td style="padding:7px 12px;border-bottom:1px solid #f5f5f5;">${status}</td>
+    </tr>`;
+  }).join("");
+}
+
+function execImport(){
+  if(!importRows.length){ toast("⚠️ インポートするデータがありません"); return; }
+  const mode=document.getElementById("imp-mode").value;
+  let added=0, updated=0, skipped=0;
+
+  if(mode==="replace"){
+    // 全置換：既存を削除して新規で入れ替え
+    const newId=()=>Math.max(0,...prods.map(p=>p.id),...importRows.map((_,i)=>i))+1;
+    let id=1;
+    prods=importRows.map(r=>({
+      id:id++, name:r.name, code:r.code, stock:0,
+      minStock:10, price:r.price, img:"", expiry:"", memo:"",
+      dept:r.dept, updatedAt:nowStr()
+    }));
+    added=prods.length;
+  } else {
+    importRows.forEach(r=>{
+      const existing=prods.find(p=>p.code===r.code);
+      if(existing){
+        if(mode==="merge"){
+          // 在庫数・賞味期限は保持し、名前・価格・部門だけ更新
+          existing.name=r.name;
+          existing.price=r.price;
+          existing.dept=r.dept;
+          existing.updatedAt=nowStr();
+          updated++;
+        } else {
+          skipped++; // addモードは重複スキップ
+        }
+      } else {
+        const newId=Math.max(0,...prods.map(p=>p.id))+1;
+        prods.push({
+          id:newId, name:r.name, code:r.code, stock:0,
+          minStock:10, price:r.price, img:"", expiry:"", memo:"",
+          dept:r.dept, updatedAt:nowStr()
+        });
+        added++;
+      }
+    });
+  }
+
+  syncSave(`TenpoVisor CSVインポート：${added}件追加、${updated}件更新、${skipped}件スキップ（PC）`);
+  toast(`✅ インポート完了：${added}件追加 ${updated}件更新 ${skipped}件スキップ`);
+
+  // プレビューを閉じてリセット
+  document.getElementById("imp-preview").style.display="none";
+  document.getElementById("imp-file").value="";
+  importRows=[];
+}
 
 const lt=localStorage.getItem("line_tok_pc"); if(lt&&document.getElementById("ltok")) document.getElementById("ltok").value=lt;
 const gu=localStorage.getItem("gas_url"); if(gu){ document.getElementById("gasurl").value=gu; }
