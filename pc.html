@@ -242,7 +242,7 @@ tr:hover td{background:#fafafa;}
 <div class="toast" id="toast"></div>
 
 <script>
-const DIMG="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='150' viewBox='0 0 200 150'%3E%3Crect width='200' height='150' fill='%23f5f5f5'/%3E%3Ctext x='100' y='80' text-anchor='middle' fill='%23ccc' font-size='14' font-family='sans-serif'%3E商品画像%3C/text%3E%3C/svg%3E";
+const DIMG="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='150' viewBox='0 0 200 150'%3E%3Crect width='200' height='150' fill='%23f5f5f5'/%3E%3Ctext x='100' y='80' text-anchor='middle' fill='%23ccc' font-size='14' font-family='sans-serif'%3E%E5%95%86%E5%93%81%E7%94%BB%E5%83%8F%3C/text%3E%3C/svg%3E";
 let prods=[], hist=[], addImg="";
 
 function gasUrl(){ return localStorage.getItem("gas_url")||""; }
@@ -266,11 +266,11 @@ async function syncLoad(){
     const rp=await gasGet("getProducts"); prods=rp.products||defProds();
     const rh=await gasGet("getHistory"); hist=rh.history||[];
     localStorage.setItem("mp",JSON.stringify(prods)); localStorage.setItem("mh",JSON.stringify(hist));
-    renderAll(); setSt("ok","同期済み："+nowStr()); toast("🔄 同期しました");
+    renderAll(); setSt("ok","同期済み："+nowStr()); toast("同期しました");
   } catch(e){
     const lp=localStorage.getItem("mp"); prods=lp?JSON.parse(lp):defProds();
     const lh=localStorage.getItem("mh"); hist=lh?JSON.parse(lh):[];
-    renderAll(); setSt("err","ローカルのみ（GAS URL設定で同期可能）");
+    renderAll(); setSt("err","ローカルのみ（設定からGAS URLを入力で同期可能）");
   }
 }
 async function syncSave(msg){
@@ -281,64 +281,147 @@ async function syncSave(msg){
     await gasPost("addHistory",{entry:{time:now,msg,device:"PC"}});
     hist.unshift({time:now,msg,device:"PC"});
     localStorage.setItem("mp",JSON.stringify(prods)); localStorage.setItem("mh",JSON.stringify(hist));
-    renderAll(); setSt("ok",now); toast("✅ 保存・同期しました");
+    renderAll(); setSt("ok",now); toast("保存・同期しました");
   } catch(e){
     localStorage.setItem("mp",JSON.stringify(prods));
-    renderAll(); setSt("err","ローカル保存のみ"); toast("⚠️ ローカル保存しました");
+    renderAll(); setSt("err","ローカル保存のみ"); toast("ローカル保存しました");
   }
 }
 
-function defProds(){ return [{id:1,name:"ずわい蟹ほぐしめし",code:"MR-001",stock:8,minStock:10,expiry:"2025-12-31",price:980,img:"",memo:""},{id:2,name:"ずわい蟹ほぐしめし（大）",code:"MR-002",stock:15,minStock:10,expiry:"2025-12-28",price:1480,img:"",memo:""}]; }
-function getSt(p){ if(p.stock===0) return{c:"bout",l:"在庫なし"}; if(p.stock<p.minStock) return{c:"blow",l:"残り少ない"}; return{c:"bok",l:"在庫あり"}; }
+function defProds(){
+  return [
+    {id:1,name:"ずわい蟹ほぐしめし",code:"MR-001",stock:8,minStock:10,expiry:"2025-12-31",price:980,img:"",memo:""},
+    {id:2,name:"ずわい蟹ほぐしめし（大）",code:"MR-002",stock:15,minStock:10,expiry:"2025-12-28",price:1480,img:"",memo:""}
+  ];
+}
+function getSt(p){
+  if(p.stock===0) return {c:"bout",l:"在庫なし"};
+  if(p.stock<p.minStock) return {c:"blow",l:"残り少ない"};
+  return {c:"bok",l:"在庫あり"};
+}
 function renderAll(){ renderDB(); renderInv(); renderMast(); renderOrd(); renderHistPg(); updCSV(); updInpSel(); }
 
 function renderDB(){
-  const tot=prods.length,out=prods.filter(p=>p.stock===0).length,low=prods.filter(p=>p.stock>0&&p.stock<p.minStock).length,ok=prods.filter(p=>p.stock>=p.minStock).length;
+  const tot=prods.length;
+  const out=prods.filter(p=>p.stock===0).length;
+  const low=prods.filter(p=>p.stock>0&&p.stock<p.minStock).length;
+  const ok=prods.filter(p=>p.stock>=p.minStock).length;
   document.getElementById("dbt").textContent=nowStr()+" 更新";
-  document.getElementById("stats").innerHTML=`<div class="stat"><div class="slbl">登録商品数</div><div class="sval">${tot}</div></div><div class="stat"><div class="slbl">在庫あり</div><div class="sval grn">${ok}</div></div><div class="stat"><div class="slbl">残り少ない</div><div class="sval org">${low}</div></div><div class="stat"><div class="slbl">在庫なし</div><div class="sval red">${out}</div></div>`;
+  document.getElementById("stats").innerHTML=
+    '<div class="stat"><div class="slbl">登録商品数</div><div class="sval">'+tot+'</div></div>'+
+    '<div class="stat"><div class="slbl">在庫あり</div><div class="sval grn">'+ok+'</div></div>'+
+    '<div class="stat"><div class="slbl">残り少ない</div><div class="sval org">'+low+'</div></div>'+
+    '<div class="stat"><div class="slbl">在庫なし</div><div class="sval red">'+out+'</div></div>';
   const al=prods.filter(p=>p.stock<p.minStock);
-  document.getElementById("alrt").innerHTML=al.length?al.map(p=>'<div class="ar"><strong>'+p.name+'</strong>（'+p.code+'）：現在庫 '+p.stock+'個 / 基準 '+p.minStock+'個</div>').join(""):"<p style='color:#888;font-size:12px;padding:8px 0;'>アラートなし</p>";
-  document.getElementById("rhist").innerHTML=hist.slice(0,6).map(h=>{const dc=h.device==="スマホ"?"dm":"dp";const dn=h.device||"PC";return '<div class="hr"><span class="ht">'+h.time+'</span><span class="hd '+dc+'">'+dn+'</span><span>'+h.msg+'</span></div>';}).join("")||"<p style='color:#888;font-size:12px;'>履歴なし</p>";
+  document.getElementById("alrt").innerHTML=al.length
+    ? al.map(p=>'<div class="ar"><strong>'+p.name+'</strong>（'+p.code+'）：現在庫 '+p.stock+'個 / 基準 '+p.minStock+'個</div>').join("")
+    : "<p style='color:#888;font-size:12px;padding:8px 0;'>アラートなし</p>";
+  document.getElementById("rhist").innerHTML=hist.slice(0,6).map(function(h){
+    var dc=h.device==="スマホ"?"dm":"dp";
+    var dn=h.device||"PC";
+    return '<div class="hr"><span class="ht">'+h.time+'</span><span class="hd '+dc+'">'+dn+'</span><span>'+h.msg+'</span></div>';
+  }).join("")||"<p style='color:#888;font-size:12px;'>履歴なし</p>";
 }
+
 function renderInv(){
-  const q=(document.getElementById("srch")?.value||"").toLowerCase();
-  const rows=prods.filter(p=>!q||p.name.includes(q)||p.code.toLowerCase().includes(q));
-  document.getElementById("invtb").innerHTML=rows.map(p=>{const s=getSt(p);return '<tr><td><img class="thumb" src="'+(p.img||DIMG)+'" alt="'+p.name+'"></td><td><strong>'+p.name+'</strong></td><td style="color:#888;">'+p.code+'</td><td><input class="ie" type="number" value="'+p.stock+'" min="0" onchange="qsave('+p.id+',parseInt(this.value))"></td><td style="color:#888;">'+p.minStock+'</td><td>'+(p.expiry||"—")+'</td><td><span class="bdg '+s.c+'">'+s.l+'</span></td><td><button class="btn" onclick="delp('+p.id+')" style="color:var(--red);font-size:11px;">削除</button></td></tr>';}).join("");
+  const q=(document.getElementById("srch")&&document.getElementById("srch").value||"").toLowerCase();
+  const rows=prods.filter(p=>!q||p.name.indexOf(q)>=0||p.code.toLowerCase().indexOf(q)>=0);
+  document.getElementById("invtb").innerHTML=rows.map(function(p){
+    var s=getSt(p);
+    return '<tr>'+
+      '<td><img class="thumb" src="'+(p.img||DIMG)+'" alt="'+p.name+'"></td>'+
+      '<td><strong>'+p.name+'</strong></td>'+
+      '<td style="color:#888;">'+p.code+'</td>'+
+      '<td><input class="ie" type="number" value="'+p.stock+'" min="0" onchange="qsave('+p.id+',parseInt(this.value))"></td>'+
+      '<td style="color:#888;">'+p.minStock+'</td>'+
+      '<td>'+(p.expiry||"—")+'</td>'+
+      '<td><span class="bdg '+s.c+'">'+s.l+'</span></td>'+
+      '<td><button class="btn" onclick="delp('+p.id+')" style="color:var(--red);font-size:11px;">削除</button></td>'+
+      '</tr>';
+  }).join("");
 }
-function qsave(id,val){ const p=prods.find(x=>x.id===id); if(p){ p.stock=val; p.updatedAt=nowStr(); syncSave(p.name+" の在庫を "+val+"個に更新（PC）"); } }
-function delp(id){ if(!confirm("この商品を削除しますか？")) return; prods=prods.filter(p=>p.id!==id); syncSave("商品を削除した（PC）"); }
-function saveInput(){ const id=parseInt(document.getElementById("pisel").value); const p=prods.find(x=>x.id===id); if(p){ p.stock=parseInt(document.getElementById("pistk").value||0); p.expiry=document.getElementById("piexp").value; p.memo=document.getElementById("pimemo").value; p.updatedAt=nowStr(); syncSave(p.name+" の在庫を "+p.stock+"個に更新（PC）"); } }
+
+function qsave(id,val){
+  var p=prods.find(function(x){return x.id===id;});
+  if(p){ p.stock=val; p.updatedAt=nowStr(); syncSave(p.name+" の在庫を "+val+"個に更新（PC）"); }
+}
+function delp(id){
+  if(!confirm("この商品を削除しますか？")) return;
+  prods=prods.filter(function(p){return p.id!==id;});
+  syncSave("商品を削除した（PC）");
+}
+function saveInput(){
+  var id=parseInt(document.getElementById("pisel").value);
+  var p=prods.find(function(x){return x.id===id;});
+  if(p){
+    p.stock=parseInt(document.getElementById("pistk").value||0);
+    p.expiry=document.getElementById("piexp").value;
+    p.memo=document.getElementById("pimemo").value;
+    p.updatedAt=nowStr();
+    syncSave(p.name+" の在庫を "+p.stock+"個に更新（PC）");
+  }
+}
 function renderOrd(){
-  const low=prods.filter(p=>p.stock<p.minStock);
-  document.getElementById("ordtb").innerHTML=low.length?low.map(p=>{const sc=p.stock===0?"bout":"blow";const sl=p.stock===0?"在庫なし":"残り少ない";return '<tr><td>'+p.name+'</td><td style="color:#888;">'+p.code+'</td><td>'+p.stock+'個</td><td>'+p.minStock+'個</td><td style="color:var(--orange);">'+(p.minStock-p.stock)+'個</td><td><input class="ie" type="number" value="'+Math.max(0,p.minStock*2-p.stock)+'" min="0" id="oq-'+p.id+'">個</td><td><span class="bdg '+sc+'">'+sl+'</span></td></tr>';}).join(""):"<tr><td colspan='7' style='text-align:center;padding:20px;color:#888;'>発注が必要な商品はありません</td></tr>";
+  var low=prods.filter(function(p){return p.stock<p.minStock;});
+  document.getElementById("ordtb").innerHTML=low.length
+    ? low.map(function(p){
+        var sc=p.stock===0?"bout":"blow";
+        var sl=p.stock===0?"在庫なし":"残り少ない";
+        return '<tr>'+
+          '<td>'+p.name+'</td>'+
+          '<td style="color:#888;">'+p.code+'</td>'+
+          '<td>'+p.stock+'個</td>'+
+          '<td>'+p.minStock+'個</td>'+
+          '<td style="color:var(--orange);">'+(p.minStock-p.stock)+'個</td>'+
+          '<td><input class="ie" type="number" value="'+Math.max(0,p.minStock*2-p.stock)+'" min="0" id="oq-'+p.id+'">個</td>'+
+          '<td><span class="bdg '+sc+'">'+sl+'</span></td>'+
+          '</tr>';
+      }).join("")
+    : "<tr><td colspan='7' style='text-align:center;padding:20px;color:#888;'>発注が必要な商品はありません</td></tr>";
 }
-function renderMast(){ document.getElementById("masttb").innerHTML=prods.map(p=>'<tr><td><img class="thumb" src="'+(p.img||DIMG)+'" alt="'+p.name+'"></td><td>'+p.name+'</td><td style="color:#888;">'+p.code+'</td><td>'+p.minStock+'個</td><td>'+(p.price||0).toLocaleString()+'円</td><td><button class="btn" onclick="delp('+p.id+')" style="color:var(--red);font-size:11px;">削除</button></td></tr>').join(""); }
+function renderMast(){
+  document.getElementById("masttb").innerHTML=prods.map(function(p){
+    return '<tr>'+
+      '<td><img class="thumb" src="'+(p.img||DIMG)+'" alt="'+p.name+'"></td>'+
+      '<td>'+p.name+'</td>'+
+      '<td style="color:#888;">'+p.code+'</td>'+
+      '<td>'+p.minStock+'個</td>'+
+      '<td>'+(p.price||0).toLocaleString()+'円</td>'+
+      '<td><button class="btn" onclick="delp('+p.id+')" style="color:var(--red);font-size:11px;">削除</button></td>'+
+      '</tr>';
+  }).join("");
+}
 function addProd(){
-  const name=document.getElementById("pmn").value.trim(), code=document.getElementById("pmc").value.trim();
-  if(!name||!code){toast("⚠️ 商品名とコードは必須です");return;}
-  const min=parseInt(document.getElementById("pmm").value||10), price=parseInt(document.getElementById("pmp").value||0);
-  const imgurl=document.getElementById("pmiu").value.trim();
-  const img=addImg||imgurl||"";
-  const newId=Math.max(0,...prods.map(p=>p.id))+1;
-  prods.push({id:newId,name,code,stock:0,minStock:min,price,img,expiry:"",memo:"",updatedAt:nowStr()});
+  var name=document.getElementById("pmn").value.trim();
+  var code=document.getElementById("pmc").value.trim();
+  if(!name||!code){ toast("商品名とコードは必須です"); return; }
+  var min=parseInt(document.getElementById("pmm").value||10);
+  var price=parseInt(document.getElementById("pmp").value||0);
+  var imgurl=document.getElementById("pmiu").value.trim();
+  var img=addImg||imgurl||"";
+  var newId=Math.max(0,...prods.map(function(p){return p.id;}))+1;
+  prods.push({id:newId,name:name,code:code,stock:0,minStock:min,price:price,img:img,expiry:"",memo:"",updatedAt:nowStr()});
   syncSave(name+"（"+code+"）を追加（PC）");
-  document.getElementById("pmn").value=""; document.getElementById("pmc").value=""; document.getElementById("pmiu").value="";
-  addImg=""; document.getElementById("pcprev").style.display="none"; document.getElementById("upbox").style.display="block";
+  document.getElementById("pmn").value="";
+  document.getElementById("pmc").value="";
+  document.getElementById("pmiu").value="";
+  addImg="";
+  document.getElementById("pcprev").style.display="none";
+  document.getElementById("upbox").style.display="block";
 }
 function pcImg(inp){
-  const f=inp.files[0]; if(!f) return;
-  const r=new FileReader();
-  r.onload=e=>{
-    const img=new Image();
+  var f=inp.files[0]; if(!f) return;
+  var r=new FileReader();
+  r.onload=function(e){
+    var img=new Image();
     img.onload=function(){
-      const MAX=600;
-      let w=img.width, h=img.height;
+      var MAX=600, w=img.width, h=img.height;
       if(w>MAX||h>MAX){ if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;} }
-      const cv=document.createElement("canvas");
+      var cv=document.createElement("canvas");
       cv.width=w; cv.height=h;
       cv.getContext("2d").drawImage(img,0,0,w,h);
       addImg=cv.toDataURL("image/jpeg",0.75);
-      const pv=document.getElementById("pcprev");
+      var pv=document.getElementById("pcprev");
       pv.src=addImg; pv.style.display="block";
       document.getElementById("upbox").style.display="none";
     };
@@ -346,28 +429,170 @@ function pcImg(inp){
   };
   r.readAsDataURL(f);
 }
-function dropImg(e){ e.preventDefault(); document.getElementById("upbox").style.borderColor=""; const f=e.dataTransfer.files[0]; if(f&&f.type.startsWith("image/")){ const inp=document.getElementById("pcf"); const dt=new DataTransfer(); dt.items.add(f); inp.files=dt.files; pcImg(inp); } }
-function prevUrl(url){ if(!url) return; addImg=url; const pv=document.getElementById("pcprev"); pv.src=url; pv.style.display="block"; }
-function updInpSel(){ const s=document.getElementById("pisel"); if(s) s.innerHTML=prods.map(p=>'<option value="'+p.id+'">'+p.name+'（'+p.code+'）</option>').join(""); }
-function updCSV(){ const r=[["商品コード","商品名","在庫数","最低在庫","賞味期限","単価","状態"],...prods.map(p=>[p.code,p.name,p.stock,p.minStock,p.expiry||"",p.price||0,getSt(p).l])]; const el=document.getElementById("csvprev"); if(el) el.textContent=r.map(x=>x.join(",")).join("
-"); }
-function expCSV(t){ let rows,fn; const d=new Date().toLocaleDateString("ja-JP").replace(/\//g,""); if(t==="inv"){rows=[["商品コード","商品名","在庫数","最低在庫","賞味期限","単価","状態"],...prods.map(p=>[p.code,p.name,p.stock,p.minStock,p.expiry||"",p.price||0,getSt(p).l])];fn="在庫一覧_"+d+".csv";}else if(t==="ord"){const low=prods.filter(p=>p.stock<p.minStock);rows=[["コード","商品名","現在庫","最低在庫","不足数"],...low.map(p=>[p.code,p.name,p.stock,p.minStock,p.minStock-p.stock])];fn="発注リスト_"+d+".csv";}else{rows=[["日時","デバイス","内容"],...hist.map(h=>[h.time,h.device||"PC",h.msg])];fn="更新履歴_"+d+".csv";} const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["﻿"+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("
-")],{type:"text/csv;charset=utf-8"})); a.download=fn; a.click(); toast("📊 "+fn+" をダウンロードしました"); }
-function renderHistPg(){ const el=document.getElementById("histl"); if(!el) return; el.innerHTML=hist.length?hist.map(h=>{const dc=h.device==="スマホ"?"dm":"dp";const dn=h.device||"PC";return '<div class="hr"><span class="ht">'+h.time+'</span><span class="hd '+dc+'">'+dn+'</span><span>'+h.msg+'</span></div>';}).join(""):"<p style='color:#888;font-size:13px;padding:12px 0;'>履歴なし</p>"; }
-function getOrdTxt(){ const low=prods.filter(p=>p.stock<p.minStock); if(!low.length) return null; let msg="【発注依頼】北浜工場へ
-"+new Date().toLocaleDateString("ja-JP")+"
+function dropImg(e){
+  e.preventDefault();
+  document.getElementById("upbox").style.borderColor="";
+  var f=e.dataTransfer.files[0];
+  if(f&&f.type.indexOf("image")===0){
+    var inp=document.getElementById("pcf");
+    var dt=new DataTransfer(); dt.items.add(f); inp.files=dt.files;
+    pcImg(inp);
+  }
+}
+function prevUrl(url){ if(!url) return; addImg=url; var pv=document.getElementById("pcprev"); pv.src=url; pv.style.display="block"; }
+function updInpSel(){
+  var s=document.getElementById("pisel");
+  if(s) s.innerHTML=prods.map(function(p){return '<option value="'+p.id+'">'+p.name+'（'+p.code+'）</option>';}).join("");
+}
+function updCSV(){
+  var r=[["商品コード","商品名","在庫数","最低在庫","賞味期限","単価","状態"]].concat(prods.map(function(p){return [p.code,p.name,p.stock,p.minStock,p.expiry||"",p.price||0,getSt(p).l];}));
+  var el=document.getElementById("csvprev");
+  if(el) el.textContent=r.map(function(x){return x.join(",");}).join("\n");
+}
+function expCSV(t){
+  var rows,fn;
+  var d=new Date().toLocaleDateString("ja-JP").replace(/\//g,"");
+  if(t==="inv"){
+    rows=[["商品コード","商品名","在庫数","最低在庫","賞味期限","単価","状態"]].concat(prods.map(function(p){return [p.code,p.name,p.stock,p.minStock,p.expiry||"",p.price||0,getSt(p).l];}));
+    fn="在庫一覧_"+d+".csv";
+  } else if(t==="ord"){
+    var low=prods.filter(function(p){return p.stock<p.minStock;});
+    rows=[["コード","商品名","現在庫","最低在庫","不足数"]].concat(low.map(function(p){return [p.code,p.name,p.stock,p.minStock,p.minStock-p.stock];}));
+    fn="発注リスト_"+d+".csv";
+  } else {
+    rows=[["日時","デバイス","内容"]].concat(hist.map(function(h){return [h.time,h.device||"PC",h.msg];}));
+    fn="更新履歴_"+d+".csv";
+  }
+  var csv="\uFEFF"+rows.map(function(r){return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(",");}).join("\r\n");
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  a.download=fn; a.click();
+  toast(fn+" をダウンロードしました");
+}
+function renderHistPg(){
+  var el=document.getElementById("histl"); if(!el) return;
+  el.innerHTML=hist.length
+    ? hist.map(function(h){
+        var dc=h.device==="スマホ"?"dm":"dp";
+        var dn=h.device||"PC";
+        return '<div class="hr"><span class="ht">'+h.time+'</span><span class="hd '+dc+'">'+dn+'</span><span>'+h.msg+'</span></div>';
+      }).join("")
+    : "<p style='color:#888;font-size:13px;padding:12px 0;'>履歴なし</p>";
+}
+function getOrdTxt(){
+  var low=prods.filter(function(p){return p.stock<p.minStock;}); if(!low.length) return null;
+  var msg="【発注依頼】北浜工場へ\n"+new Date().toLocaleDateString("ja-JP")+"\n\n";
+  low.forEach(function(p){ var q=document.getElementById("oq-"+p.id); msg+="・"+p.name+"（"+p.code+"）："+(q?q.value:0)+"個\n"; });
+  var n=document.getElementById("ordnote"); if(n&&n.value) msg+="\n備考："+n.value;
+  return msg;
+}
+function copyOrderPC(){
+  var t=getOrdTxt(); if(!t){toast("発注対象なし");return;}
+  navigator.clipboard.writeText(t).then(function(){toast("コピーしました");}).catch(function(){toast("コピー失敗");});
+}
+function sendLinePC(){
+  var tok=localStorage.getItem("line_tok_pc")||"";
+  if(!tok){toast("設定からLINEトークンを設定してください"); pg("settings",null); return;}
+  var msg=getOrdTxt(); if(!msg){toast("発注対象なし");return;}
+  sendL(tok,msg);
+}
+function testLine(){
+  var tok=localStorage.getItem("line_tok_pc")||(document.getElementById("ltok")?document.getElementById("ltok").value:"");
+  if(!tok){toast("トークンを入力してください");return;}
+  sendL(tok,"【テスト】マルマ松本商店 在庫管理PC版からのテスト通知です");
+}
+function sendL(tok,msg){
+  fetch("https://notify-api.line.me/api/notify",{
+    method:"POST",
+    headers:{"Content-Type":"application/x-www-form-urlencoded","Authorization":"Bearer "+tok},
+    body:"message="+encodeURIComponent(msg)
+  }).then(function(r){toast(r.ok?"LINEに送信しました":"LINE送信失敗");}).catch(function(){toast("ネットワークエラー");});
+}
 
-"; low.forEach(p=>{ const q=document.getElementById("oq-"+p.id)?.value||0; msg+="・"+p.name+"（"+p.code+"）："+q+"個
-"; }); const n=document.getElementById("ordnote")?.value; if(n) msg+="
-備考："+n; return msg; }
-function copyOrderPC(){ const t=getOrdTxt(); if(!t){toast("発注対象なし");return;} navigator.clipboard.writeText(t).then(()=>toast("📋 コピーしました")).catch(()=>toast("⚠️ コピー失敗")); }
-function sendLinePC(){ const tok=localStorage.getItem("line_tok_pc")||""; if(!tok){toast("⚠️ 設定からLINEトークンを設定してください");pg("settings",null);return;} const msg=getOrdTxt(); if(!msg){toast("発注対象なし");return;} sendL(tok,msg); }
-function testLine(){ const tok=localStorage.getItem("line_tok_pc")||document.getElementById("ltok").value; if(!tok){toast("⚠️ トークンを入力してください");return;} sendL(tok,"【テスト】マルマ松本商店 在庫管理PC版からのテスト通知です"); }
-function sendL(tok,msg){ fetch("https://notify-api.line.me/api/notify",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded","Authorization":"Bearer "+tok},body:"message="+encodeURIComponent(msg)}).then(r=>toast(r.ok?"✅ LINEに送信しました":"⚠️ LINE送信失敗")).catch(()=>toast("⚠️ ネットワークエラー")); }
+// CSVインポート
+var importRows=[];
+function dropCSV(e){
+  e.preventDefault();
+  var box=document.getElementById("imp-box");
+  box.style.borderColor="#e0e0e0"; box.style.background="#fafafa";
+  var f=e.dataTransfer.files[0]; if(f) readCSVFile(f);
+}
+function handleCSV(inp){ var f=inp.files[0]; if(f) readCSVFile(f); }
+function readCSVFile(file){
+  var reader=new FileReader();
+  reader.onload=function(e){ parseCSV(e.target.result.replace(/^\uFEFF/,"")); };
+  reader.readAsText(file,"UTF-8");
+}
+function parseCSV(text){
+  var lines=text.split("\n").filter(function(l){return l.trim();});
+  if(lines.length<2){toast("CSVの読み込みに失敗しました");return;}
+  var headers=lines[0].split(",").map(function(h){return h.trim().replace(/^"|"$/g,"");});
+  var idxCode=headers.findIndex(function(h){return h.indexOf("商品コード")>=0;});
+  var idxName=headers.findIndex(function(h){return h.indexOf("商品名")>=0;});
+  var idxPrice=headers.findIndex(function(h){return h.indexOf("税抜金額")>=0;});
+  var idxDept=headers.findIndex(function(h){return h.indexOf("部門")>=0;});
+  importRows=[]; var skipCount=0;
+  for(var i=1;i<lines.length;i++){
+    var cols=lines[i].split(",").map(function(c){return c.trim().replace(/^"|"$/g,"");});
+    if(cols.length<3) continue;
+    var code=cols[idxCode]||"";
+    var name=cols[idxName]||"";
+    var price=parseInt(cols[idxPrice]||0)||0;
+    var dept=cols[idxDept]||"";
+    if(!name||name.indexOf("★新規★")>=0||name.trim()===""){skipCount++;continue;}
+    var dm=dept.match(/^(\d+)\s*\[(.+)\]$/);
+    var deptName=dm?dm[2]:dept;
+    importRows.push({code:code,name:name,dept:deptName,price:price,stock:0,minStock:10,expiry:"",img:"",memo:""});
+  }
+  renderImportPreview(skipCount);
+}
+function renderImportPreview(skipCount){
+  var el=document.getElementById("imp-preview"); el.style.display="block";
+  document.getElementById("imp-count").textContent=importRows.length+"件の商品を読み込みました";
+  document.getElementById("imp-skip").textContent="（★新規★など "+skipCount+"件を除外）";
+  document.getElementById("imp-tbody").innerHTML=importRows.map(function(r){
+    var exists=prods.find(function(p){return p.code===r.code;});
+    var status=exists?'<span style="color:#e65100;font-size:11px;">既存（'+exists.stock+'個）</span>':'<span style="color:#2e7d32;font-size:11px;">新規</span>';
+    return '<tr>'+
+      '<td style="padding:7px 12px;border-bottom:1px solid #f5f5f5;font-size:12px;color:#888;">'+r.code+'</td>'+
+      '<td style="padding:7px 12px;border-bottom:1px solid #f5f5f5;font-size:13px;"><strong>'+r.name+'</strong></td>'+
+      '<td style="padding:7px 12px;border-bottom:1px solid #f5f5f5;font-size:12px;color:#666;">'+r.dept+'</td>'+
+      '<td style="padding:7px 12px;border-bottom:1px solid #f5f5f5;font-size:12px;text-align:right;">'+r.price.toLocaleString()+'円</td>'+
+      '<td style="padding:7px 12px;border-bottom:1px solid #f5f5f5;">'+status+'</td>'+
+      '</tr>';
+  }).join("");
+}
+function execImport(){
+  if(!importRows.length){toast("インポートするデータがありません");return;}
+  var mode=document.getElementById("imp-mode").value;
+  var added=0,updated=0,skipped=0;
+  if(mode==="replace"){
+    var id=1;
+    prods=importRows.map(function(r){return {id:id++,name:r.name,code:r.code,stock:0,minStock:10,price:r.price,img:"",expiry:"",memo:"",dept:r.dept,updatedAt:nowStr()};});
+    added=prods.length;
+  } else {
+    importRows.forEach(function(r){
+      var existing=prods.find(function(p){return p.code===r.code;});
+      if(existing){
+        if(mode==="merge"){existing.name=r.name;existing.price=r.price;existing.dept=r.dept;existing.updatedAt=nowStr();updated++;}
+        else skipped++;
+      } else {
+        var newId=Math.max(0,...prods.map(function(p){return p.id;}))+1;
+        prods.push({id:newId,name:r.name,code:r.code,stock:0,minStock:10,price:r.price,img:"",expiry:"",memo:"",dept:r.dept,updatedAt:nowStr()});
+        added++;
+      }
+    });
+  }
+  syncSave("TenpoVisor CSVインポート："+added+"件追加、"+updated+"件更新、"+skipped+"件スキップ（PC）");
+  toast("インポート完了："+added+"件追加 "+updated+"件更新 "+skipped+"件スキップ");
+  document.getElementById("imp-preview").style.display="none";
+  document.getElementById("imp-file").value="";
+  importRows=[];
+}
 
 function pg(name,el){
-  document.querySelectorAll(".pg").forEach(p=>p.classList.remove("on"));
-  document.querySelectorAll(".ni").forEach(n=>n.classList.remove("on"));
+  document.querySelectorAll(".pg").forEach(function(p){p.classList.remove("on");});
+  document.querySelectorAll(".ni").forEach(function(n){n.classList.remove("on");});
   document.getElementById("p-"+name).classList.add("on");
   if(el) el.classList.add("on");
   if(name==="dashboard") renderDB();
@@ -378,140 +603,10 @@ function pg(name,el){
   if(name==="export") updCSV();
   if(name==="history") renderHistPg();
 }
-function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("on"); setTimeout(()=>t.classList.remove("on"),2800); }
+function toast(msg){ var t=document.getElementById("toast"); t.textContent=msg; t.classList.add("on"); setTimeout(function(){t.classList.remove("on");},2800); }
 
-// ── CSVインポート ─────────────────────────────────
-let importRows = [];
-
-function dropCSV(e){
-  e.preventDefault();
-  const box=document.getElementById("imp-box");
-  box.style.borderColor="#e0e0e0"; box.style.background="#fafafa";
-  const f=e.dataTransfer.files[0];
-  if(f) readCSVFile(f);
-}
-function handleCSV(inp){
-  const f=inp.files[0];
-  if(f) readCSVFile(f);
-}
-function readCSVFile(file){
-  const reader=new FileReader();
-  reader.onload=function(e){
-    // BOM除去
-    let text=e.target.result.replace(/^﻿/,"");
-    parseCSV(text);
-  };
-  reader.readAsText(file,"UTF-8");
-}
-
-function parseCSV(text){
-  const lines=text.split(/\r?\n/).filter(l=>l.trim());
-  if(lines.length<2){ toast("⚠️ CSVの読み込みに失敗しました"); return; }
-
-  // ヘッダー行
-  const headers=lines[0].split(",").map(h=>h.trim().replace(/^"|"$/g,""));
-  // 列インデックスを取得
-  const idxCode=headers.findIndex(h=>h.includes("商品コード"));
-  const idxName=headers.findIndex(h=>h.includes("商品名"));
-  const idxPrice=headers.findIndex(h=>h.includes("税抜金額"));
-  const idxDept=headers.findIndex(h=>h.includes("部門"));
-
-  importRows=[];
-  let skipCount=0;
-
-  for(let i=1;i<lines.length;i++){
-    const cols=lines[i].split(",").map(c=>c.trim().replace(/^"|"$/g,""));
-    if(cols.length<3) continue;
-    const code=cols[idxCode]||"";
-    const name=cols[idxName]||"";
-    const priceStr=cols[idxPrice]||"0";
-    const dept=cols[idxDept]||"";
-    const price=parseInt(priceStr)||0;
-
-    // 除外条件：★新規★、空白、価格0かつ名前がその他系
-    if(!name || name.includes("★新規★") || name.trim()===""){
-      skipCount++; continue;
-    }
-
-    // 部門コードと部門名を分離（例："101 [海鮮丼]" → code:101, name:海鮮丼）
-    const deptMatch=dept.match(/^(\d+)\s*\[(.+)\]$/);
-    const deptCode=deptMatch?deptMatch[1]:"";
-    const deptName=deptMatch?deptMatch[2]:dept;
-
-    importRows.push({
-      code, name, dept:deptName, deptCode, price,
-      stock:0, minStock:10, expiry:"", img:"", memo:""
-    });
-  }
-
-  renderImportPreview(skipCount);
-}
-
-function renderImportPreview(skipCount){
-  const el=document.getElementById("imp-preview");
-  el.style.display="block";
-  document.getElementById("imp-count").textContent=`${importRows.length}件の商品を読み込みました`;
-  document.getElementById("imp-skip").textContent=`（★新規★など ${skipCount}件を除外）`;
-
-  document.getElementById("imp-tbody").innerHTML=importRows.map(r=>{
-    const exists=prods.find(p=>p.code===r.code);
-    const status=exists?'<span style="color:#e65100;font-size:11px;">既存（'+exists.stock+'個）</span>':'<span style="color:#2e7d32;font-size:11px;">新規</span>';
-    return '<tr><td style="padding:7px 12px;border-bottom:1px solid #f5f5f5;font-size:12px;color:#888;">'+r.code+'</td><td style="padding:7px 12px;border-bottom:1px solid #f5f5f5;font-size:13px;"><strong>'+r.name+'</strong></td><td style="padding:7px 12px;border-bottom:1px solid #f5f5f5;font-size:12px;color:#666;">'+r.dept+'</td><td style="padding:7px 12px;border-bottom:1px solid #f5f5f5;font-size:12px;text-align:right;">'+r.price.toLocaleString()+'円</td><td style="padding:7px 12px;border-bottom:1px solid #f5f5f5;">'+status+'</td></tr>';
-  }).join("");
-}
-
-function execImport(){
-  if(!importRows.length){ toast("⚠️ インポートするデータがありません"); return; }
-  const mode=document.getElementById("imp-mode").value;
-  let added=0, updated=0, skipped=0;
-
-  if(mode==="replace"){
-    // 全置換：既存を削除して新規で入れ替え
-    const newId=()=>Math.max(0,...prods.map(p=>p.id),...importRows.map((_,i)=>i))+1;
-    let id=1;
-    prods=importRows.map(r=>({
-      id:id++, name:r.name, code:r.code, stock:0,
-      minStock:10, price:r.price, img:"", expiry:"", memo:"",
-      dept:r.dept, updatedAt:nowStr()
-    }));
-    added=prods.length;
-  } else {
-    importRows.forEach(r=>{
-      const existing=prods.find(p=>p.code===r.code);
-      if(existing){
-        if(mode==="merge"){
-          // 在庫数・賞味期限は保持し、名前・価格・部門だけ更新
-          existing.name=r.name;
-          existing.price=r.price;
-          existing.dept=r.dept;
-          existing.updatedAt=nowStr();
-          updated++;
-        } else {
-          skipped++; // addモードは重複スキップ
-        }
-      } else {
-        const newId=Math.max(0,...prods.map(p=>p.id))+1;
-        prods.push({
-          id:newId, name:r.name, code:r.code, stock:0,
-          minStock:10, price:r.price, img:"", expiry:"", memo:"",
-          dept:r.dept, updatedAt:nowStr()
-        });
-        added++;
-      }
-    });
-  }
-
-  syncSave(`TenpoVisor CSVインポート：${added}件追加、${updated}件更新、${skipped}件スキップ（PC）`);
-  toast(`✅ インポート完了：${added}件追加 ${updated}件更新 ${skipped}件スキップ`);
-
-  // プレビューを閉じてリセット
-  document.getElementById("imp-preview").style.display="none";
-  document.getElementById("imp-file").value="";
-  importRows=[];
-}
-
-const lt=localStorage.getItem("line_tok_pc"); if(lt&&document.getElementById("ltok")) document.getElementById("ltok").value=lt;
-const gu=localStorage.getItem("gas_url"); if(gu){ document.getElementById("gasurl").value=gu; }
+var lt=localStorage.getItem("line_tok_pc"); if(lt&&document.getElementById("ltok")) document.getElementById("ltok").value=lt;
+var gu=localStorage.getItem("gas_url"); if(gu&&document.getElementById("gasurl")) document.getElementById("gasurl").value=gu;
 syncLoad();
 </script>
 </body>
