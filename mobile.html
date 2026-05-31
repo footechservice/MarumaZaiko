@@ -136,9 +136,9 @@ body{font-family:-apple-system,"Hiragino Sans",sans-serif;background:var(--bg);c
     <h2>新商品を追加</h2>
     <div class="fg">
       <label>商品画像</label>
-      <div id="upa" class="upa" onclick="trigFile()">
-        <div class="ic">📷</div>
-        <p>タップして写真を撮るか画像を選択</p>
+      <div id="upa" style="display:flex;gap:10px;">
+        <button type="button" onclick="trigCam()" style="flex:1;padding:18px 8px;background:#1a1a2e;color:#fff;border:none;border-radius:12px;font-size:15px;cursor:pointer;">📷 カメラで撮影</button>
+        <button type="button" onclick="trigFile()" style="flex:1;padding:18px 8px;background:#f5f5f5;color:#1a1a1a;border:1px solid #e0e0e0;border-radius:12px;font-size:15px;cursor:pointer;">🖼️ ライブラリから選択</button>
       </div>
       <img id="uprev" class="uprev" alt="プレビュー">
       <div id="upbtns" class="upbtns">
@@ -252,7 +252,7 @@ function addProd(){
 function trigFile(){ document.getElementById("ffile").click(); }
 function trigCam(){ document.getElementById("fcam").click(); }
 function handleImg(inp){ const f=inp.files[0]; if(!f) return; const r=new FileReader(); r.onload=e=>{ addImg=e.target.result; const pv=document.getElementById("uprev"); pv.src=addImg; pv.style.display="block"; document.getElementById("upa").style.display="none"; document.getElementById("upbtns").style.display="flex"; }; r.readAsDataURL(f); }
-function clearImg(){ addImg=""; document.getElementById("uprev").style.display="none"; document.getElementById("upa").style.display="block"; document.getElementById("upbtns").style.display="none"; }
+function clearImg(){ addImg=""; document.getElementById("uprev").style.display="none"; document.getElementById("upa").style.display="flex"; document.getElementById("upbtns").style.display="none"; }
 
 function getOrderText(){
   const low=prods.filter(p=>p.stock<p.minStock); if(!low.length) return null;
